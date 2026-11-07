@@ -1,6 +1,6 @@
 # SoftProf
 
-User guide - version 2.4.7 - 6 November 2026
+User guide - version 2.5.2 - 7 November 2026
 
 Christer Törnkvist - christer@borgasundsfotografiska.se
 GNU GPL version 3 or later (GPL-3.0-or-later).
@@ -11,7 +11,7 @@ SoftProf compares an image with a prediction of its printed appearance. It helps
 
 ### Install the app
 
-Open `SoftProf-2.4.7-macos.dmg`, choose **Apple Silicon** or **Intel** to match your Mac and drag that app to **Applications**, eject the disk image and launch the app from Applications. The DMG contains two labelled apps: **Apple Silicon requires macOS 14+; Intel requires macOS 13 Ventura+**. Apple Silicon is ARM64; Intel is x86_64. All bundled Intel binaries are checked against the Ventura deployment target. Physical Ventura hardware has not been tested here. Install only the matching app. Python and the required libraries are included; the development project is not needed.
+Open `SoftProf-2.5.2-macos.dmg`, choose **Apple Silicon** or **Intel** to match your Mac and drag that app to **Applications**, eject the disk image and launch the app from Applications. The DMG contains two labelled apps: **Apple Silicon requires macOS 14+; Intel requires macOS 13 Ventura+**. Apple Silicon is ARM64; Intel is x86_64. All bundled Intel binaries are checked against the Ventura deployment target. Physical Ventura hardware has not been tested here. Install only the matching app. Python and the required libraries are included; the development project is not needed.
 
 The package is ad hoc signed, but not Developer ID signed or Apple-notarized. If macOS blocks the first launch, review it in **System Settings > Privacy & Security > Open Anyway**. The DMG includes both manuals, the GPL license and application source.
 
@@ -28,11 +28,11 @@ The image dialog starts on Desktop and the ICC dialog in `/Library/ColorSync/Pro
 
 ### Start with a known image
 
-Choose **Open image**, then select the working colour space and printer/paper ICC profile. The original appears on the left and the current simulation on the right. An untagged image needs an explicitly chosen source profile before its colours can be interpreted.
+Choose **Open image**, then a tab. **1 Colour spaces** compares the original with a chosen working space. **2 Printer profiles** compares the original with a printer profile, or two printer profiles. For an untagged image, a dialog asks you to choose its actual source profile or a custom ICC file, then click **Show image**. Cancel leaves the source selector available; the source selector is hidden when an embedded ICC is available.
 
 <!-- pipeline -->
 
-The conversion path is: **source profile > working colour space > printer/paper profile**. A separate display conversion prepares the proof for the screen; macOS ColorSync adapts the tagged preview to the current monitor.
+The tabs use separate paths: **source > working space**, or **source > printer profile**. Printer comparisons do not use the working-space selection from the other tab. A separate display conversion prepares the proof for the screen; macOS ColorSync adapts the tagged preview to the current monitor.
 
 ### Keep the physical setup consistent
 
@@ -42,11 +42,11 @@ Use the ICC profile for the actual printer, paper, ink and driver settings. The 
 
 ### Source profile and working colour space
 
-**Working space** in the main window is the same stage labelled **2 Working space** in the gamut window.
+In **1 Colour spaces**, choose **Working space** to explore sRGB, Adobe RGB, Display P3, ProPhoto RGB or a custom ICC profile. The gamut window shows source and working colours. In **2 Printer profiles**, choose the printer/paper ICC profile; the gamut window shows source and print colours.
 
 An embedded ICC profile is always used as the source. For an image without a profile, select the profile that actually describes its stored values. Assigning that interpretation does not change the original file. Choosing the wrong source profile changes the meaning of every colour.
 
-The working-space menu offers sRGB, Adobe RGB (1998), Display P3, ProPhoto RGB and a custom ICC file. ProPhoto RGB uses the macOS ROMM RGB system profile. **Keep the image colour space** avoids an unnecessary working-space round trip. The chosen rendering intent and black point compensation apply to conversions into the working space and from it to the printer profile.
+The working-space menu offers sRGB, Adobe RGB (1998), Display P3, ProPhoto RGB and a custom ICC file. ProPhoto RGB uses the macOS ROMM RGB system profile. **Keep the image colour space** avoids an unnecessary working-space round trip. Rendering intent and BPC apply to the conversion in the active tab. Paper-white and black-ink simulation are available only in Printer profiles.
 
 | Rendering intent | Practical interpretation |
 | --- | --- |
@@ -72,13 +72,13 @@ Previews are ICC-tagged Display P3 images shown through macOS AppKit/ColorSync. 
 
 ### Side-by-side comparison
 
-The left view starts as the original interpreted with its source profile. The right view follows the current working-space and printer settings. Without a printer profile, the right view shows only the working-space conversion.
+Both tabs start with the original on the left. In Colour spaces, the right shows the selected working space. In Printer profiles, the right shows the selected printer/paper simulation. Each tab keeps its own settings while you switch. In Colour spaces, the left image is always the original. Working space, rendering intent and BPC are grouped above the right image. Only Printer profiles can lock a reference; opening a new image clears it.
 
-Choose **Lock simulation as reference** to keep result A on the left. Change profiles, rendering intent or compensation to create result B on the right. The reference caption preserves the settings used for A. **Reset left to original** restores the source image on the left while keeping the current right-hand profile and settings.
+In Colour spaces, change the controls above the right image to compare their effect against the unchanged original on the left. In Printer profiles, use **Compare with another profile…** to lock the current simulation and select a second printer profile. The reference caption preserves its settings. **Reset left to original** restores the source image on the left while keeping the current right-hand profile and settings.
 
-**Compare with another profile…** locks the current simulation on the left and opens the profile dialog for the right. Captions identify each profile and its settings. Further changes affect the right while the left stays locked.
+Captions identify each profile and its settings. Further changes affect the right while the left stays locked.
 
-**Swap left ↔ right** exchanges the two simulations together with their profiles, working space, rendering intent, BPC and paper/ink settings. The right side remains editable; the left stays locked. Swapping twice restores the starting comparison.
+In Printer profiles, **Swap left ↔ right** exchanges the two simulations together with their profiles, working space, rendering intent, BPC and paper/ink settings. The right side remains editable; the left stays locked. Swapping twice restores the starting comparison.
 
 ### Zoom and scroll
 
@@ -96,7 +96,7 @@ Clicking a locked reference still follows that original pixel through the **curr
 
 ### Read the stage values
 
-The gamut window reports source, working-space and predicted printer values. RGB or CMYK channel numbers may change while the Lab position stays almost unchanged: a colour-preserving conversion aims to keep the colour, not the same numbers. A movement indicates a predicted colour change, for example from gamut mapping or quantisation.
+The gamut window reports source and working-space values in the first tab, and source and predicted printer values in the second. RGB or CMYK channel numbers may change while the Lab position stays almost unchanged: a colour-preserving conversion aims to keep the colour, not the same numbers. A movement indicates a predicted colour change, for example from gamut mapping or quantisation.
 
 ## 4. Read the gamut diagram
 
@@ -106,7 +106,7 @@ All profiles are compared in **CIELAB D50**. The default 2D diagram shows the a*
 
 ### Contours, points and arrows
 
-The contours show the source, working and printer profiles. Toggle them separately to reduce clutter. Numbered points and arrows follow **original > working space > predicted print**. Grey rings show the previous settings for the same pixel.
+Contours show the profiles in the active tab. Numbered points and arrows follow **original > working space** or **original > predicted print**. Toggle contours separately to reduce clutter. Grey rings show the previous settings for the same pixel.
 
 The numerical rows show L*, a*, b*, device-channel values and **ΔE76 from the original**. Lab is evaluated through LittleCMS with floating-point output and fixed absolute D50 colourimetry. Device-channel conversions follow the same 8- or 16-bit pipeline as export. The printer point is the profile's prediction, not a measured print. The screen profile and paper-white preview toggle are not part of these analysis coordinates.
 
@@ -122,9 +122,11 @@ L*, a*, b* and Delta E use fixed aligned columns. Plot drawing stays within its 
 
 ## 5. 3D colour space
 
-Choose **Show 3D colour space**; **Show 2D** restores the existing diagram. Choose **Original**, **Working space** or **Print** in the 3D view menu. Drag the plot to rotate, scroll to zoom, or choose **Reset 3D view**. L* increases upwards towards lighter colours, a* runs from green (negative) to red (positive), and b* from blue (negative) to yellow (positive). Follow the labelled axes after rotating the view. The selected image pixel is marked with a white ring in the chosen stage. The L* background controls apply only to 2D.
+Choose **Show 3D colour space**; **Show 2D** restores the existing diagram. Choose **Original** and **Working space** in the first tab, or **Original** and **Print** in the second. Drag the plot to rotate, scroll to zoom, or choose **Reset 3D view**. L* increases upwards towards lighter colours, a* runs from green (negative) to red (positive), and b* from blue (negative) to yellow (positive). Follow the labelled axes after rotating the view. The selected image pixel is marked with a white ring in the chosen stage. The L* background controls apply only to 2D.
 
-Enable **Show movement**, then change a working space, printer profile, rendering intent or BPC in the main window. The same representatives animate from the previous positions to the new ones; bright yellow arrows remain for comparison. Arrowheads point to the new result. The text below the plot explains this direction and identifies the before/after working spaces and displayed stages, including when you change colour space. Changing the displayed stage also shows its movement. Disable the option for a static view. Colour-preserving conversions may barely move; paper-white and ink viewing toggles do not alter absolute Lab positions.
+Enable **Show movement** for yellow arrows. In **Printer profiles**, arrows always run **original > predicted print**, regardless of which point set is selected: the tail is the original colour and the arrowhead is the predicted print. In **Colour spaces**, arrows compare previous and new positions as settings or displayed stages change. Paper-white and ink viewing toggles do not alter absolute Lab positions.
+
+Faint, thin arrows represent rare colours; stronger arrows represent more frequent colours in the sampled image. Arrow length shows the colour difference, not frequency. No colour groups are hidden by this weighting. Long arrows can come from a few highly saturated colours that the printer cannot reproduce; they do not mean that most of the image changes that much.
 
 **Compare left → right** compares a locked left simulation with the current right simulation. Points always show the right-hand colours. A yellow arrow starts at each corresponding left-hand position and ends at the right-hand point. Small arrowheads keep the points visible; reference rings are omitted. The short caption identifies both profiles. Swapping the images reverses this comparison. Resetting the left image clears the locked-reference comparison. These are absolute D50 profile colours; paper/ink screen simulation does not change their coordinates.
 
@@ -134,7 +136,7 @@ The 3D view shows up to 1,024 frequent groups from at most 65,536 deterministic 
 
 ## 6. Export and print
 
-Choose **Convert and save** after selecting an image and printer/paper profile. The app processes the full image via the selected working space and printer profile, then embeds the selected printer ICC file **byte for byte**. The source image cannot be overwritten. New files follow the system umask; replacing an existing export preserves its permission bits. A temporary file is completed before replacing the destination.
+Choose **Convert and save** after selecting an image and printer/paper profile. Saving is available in Printer profiles. The app processes the full original directly from its source profile to the right-hand printer profile, then embeds the selected printer ICC file **byte for byte**. The source image cannot be overwritten. New files follow the system umask; replacing an existing export preserves its permission bits. A temporary file is completed before replacing the destination.
 
 | Format | Supported output channels |
 | --- | --- |

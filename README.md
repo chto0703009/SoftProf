@@ -1,15 +1,15 @@
 # SoftProf
 
-A Python macOS application for comparing ICC colour-space conversions and simulating printer/paper output. Compare the original and a soft proof side by side, lock an A/B reference, and click an image to follow a colour through the source, working and printer profiles in CIELAB D50.
+A Python macOS application with two separate workflows: **Colour spaces** explores working-space conversions; **Printer profiles** compares the original with a printer/paper soft proof, or two printer profiles directly from the image source profile. Compare the original and a soft proof side by side, lock an A/B reference, and click an image to follow a colour through the source, working and printer profiles in CIELAB D50.
 
-**Version:** 2.4.7
+**Version:** 2.5.2
 **Author:** Christer Törnkvist
 **Contact:** [christer@borgasundsfotografiska.se](mailto:christer@borgasundsfotografiska.se)
 **License:** [GNU GPL version 3 or later](LICENSE) (`GPL-3.0-or-later`). No warranty. See [license scope](LICENSE_SCOPE.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Install
 
-Download the installer from [GitHub Releases](https://github.com/chto0703009/SoftProf/releases/latest). The file is `SoftProf-2.4.7-macos.dmg` for **Apple Silicon on macOS 14+ or Intel on macOS 13 Ventura+**. It contains two separately labelled apps, not one universal binary: **SoftProf - Apple Silicon.app** (ARM64) and **SoftProf - Intel.app** (x86_64).
+Download the installer from [GitHub Releases](https://github.com/chto0703009/SoftProf/releases/latest). The file is `SoftProf-2.5.2-macos.dmg` for **Apple Silicon on macOS 14+ or Intel on macOS 13 Ventura+**. It contains two separately labelled apps, not one universal binary: **SoftProf - Apple Silicon.app** (ARM64) and **SoftProf - Intel.app** (x86_64).
 
 1. Open the DMG and drag **only the app matching your Mac** to Applications: **Apple Silicon** for an Apple-chip Mac (M1/M2/M3 etc), or **Intel** for an Intel Mac.
 2. Eject the disk image and launch the app from Applications.
@@ -38,17 +38,17 @@ The DMG also contains the full GPL text, author/contact information, both manual
 
 ## Features
 
-- Embedded source ICC profiles, or explicit source-profile selection for untagged images.
-- Working spaces: sRGB, Adobe RGB (1998), Display P3, ProPhoto RGB via the macOS ROMM RGB profile, and custom ICC files.
-- Printer/paper soft proof with relative colorimetric, absolute colorimetric or perceptual rendering, with optional black point compensation.
+- Embedded source ICC profiles, or an automatic source-profile dialog when opening an untagged image. Select the actual source space or a custom ICC file; the original is unchanged.
+- In the Colour spaces tab, working spaces: sRGB, Adobe RGB (1998), Display P3, ProPhoto RGB via the macOS ROMM RGB profile, and custom ICC files.
+- In the Printer profiles tab, direct source-to-printer soft proof with relative colorimetric, absolute colorimetric or perceptual rendering, with optional black point compensation.
 - Optional paper-white simulation, A/B reference lock and linked zoom/scroll. **Compare with another profile…** locks the current proof on the left and selects a new printer/paper profile for the right.
-- Swap the left/right comparisons with their complete settings, or reset only the left view to the original. In 3D, compare locked left colours with current right colours using small yellow arrows ending at the right-hand colour points.
+- Swap the left/right comparisons with their complete settings, or reset only the left view to the original. Each tab retains its own settings during the session. Colour spaces always keeps the original on the left; its colour-space, intent and BPC controls sit above the right image. Locking, swapping and resetting comparisons are confined to Printer profiles. In 3D, compare locked left colours with current right colours using small yellow arrows ending at the right-hand colour points.
 - Click-to-sample gamut analysis in the a*/b* plane, with approximate colour backgrounds, Lab values and channel values for each stage.
 - Full-resolution TIFF/PNG/JPEG export with the selected printer ICC file embedded byte for byte; original-file overwrite protection.
 - Live Swedish/English UI, saved language preference, visible ARM/Intel/Rosetta runtime information and a Quit button at the bottom right.
 - Author, contact and GPL information in the About menu; a menu item opens the full license.
 
-The gamut window switches between the existing 2D diagram and a rotatable 3D colour space. Choose original, working or printer colours; enable **Show movement** to animate the same representative colours and retain arrows as conversion settings change. Point size reflects approximate sampled frequency. Bright yellow arrows point from the previous position to the new result; the text below identifies the before/after working spaces and displayed stages, including after colour-space changes.
+The gamut window switches between 2D and a rotatable 3D colour space. In Printer profiles, yellow arrows always run from original to predicted print, regardless of the selected point set. Explicit locked comparisons retain left-to-right arrows. In Colour spaces, movement arrows compare previous and new positions. Point size and arrow emphasis reflect sampled frequency: rare colours have faint, thin arrows, while common colours are stronger. Arrow length is the colour difference, not frequency; no colour groups or numerical endpoints are removed.
 
 ## Colour handling and limits
 

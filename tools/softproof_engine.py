@@ -15,6 +15,10 @@ from PIL import Image, ImageCms, ImageOps
 from icc_processing import process, profile_mode, save_image
 
 
+class MissingSourceProfile(ValueError):
+    """An untagged image requires the user's explicit source interpretation."""
+
+
 def load_profile(path):
     if path == 'srgb':
         return ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB'))
@@ -63,7 +67,7 @@ def load_image(path, source_path=None):
     elif source_path:
         source = load_profile(source_path)
     else:
-        raise ValueError('Bilden saknar ICC-profil. Välj en källprofil som beskriver bildens RGB-värden.')
+        raise MissingSourceProfile('Bilden saknar ICC-profil. Välj en källprofil som beskriver bildens RGB-värden.')
     mode = {'RGBA': 'RGB', 'LA': 'L'}.get(image.mode, image.mode)
     if profile_mode(source) != mode:
         raise ValueError('Källprofilens färgrymd stämmer inte med bildens kanaler.')
@@ -215,6 +219,7 @@ def main():
         response = run(json.loads(request_path.read_text()))
     except Exception as error:
         response = dict(ok=False, error=str(error))
+        if isinstance(error, MissingSourceProfile): response['code'] = 'missing_source_profile'
     response_path.write_text(json.dumps(response, ensure_ascii=False))
     return 0 if response['ok'] else 1
 

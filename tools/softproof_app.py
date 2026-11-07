@@ -42,7 +42,7 @@ CONTACT = 'christer@borgasundsfotografiska.se'
 GITHUB = 'https://github.com/chto0703009/SoftProf'
 
 ROLES = ('source', 'working', 'printer')
-ROLE_KEYS = ('1 Original', '2 Arbetsfärgrymd', '3 Utskrift')
+ROLE_KEYS = ('1 Original', '2 Arbetsfärgrymd', '2 Utskrift')
 COLORS = (A.NSColor.systemBlueColor(), A.NSColor.systemOrangeColor(), A.NSColor.systemPurpleColor())
 AXES = ((1, 2),)
 ACTIVE = None
@@ -304,9 +304,10 @@ class GamutPlot(A.NSView):
                 A.NSColor.whiteColor().colorWithAlphaComponent_(0.8).setStroke(); path.setLineWidth_(3.6); path.stroke()
             color.setStroke(); path.setLineWidth_(1.8); path.stroke()
         for sample in self.previous:
+            if sample['role'] not in self.visible_roles: continue
             p = labpos(sample['lab']); A.NSColor.grayColor().setStroke()
             ring = A.NSBezierPath.bezierPathWithOvalInRect_(R(p.x-6, p.y-6, 12, 12)); ring.stroke()
-        samples = self.data.get('points', [])
+        samples = [p for p in self.data.get('points', []) if p['role'] in self.visible_roles]
         for first, second in zip(samples, samples[1:]):
             start, end = labpos(first['lab']), labpos(second['lab'])
             dx, dy = end.x-start.x, end.y-start.y; length = math.hypot(dx, dy)
@@ -320,7 +321,7 @@ class GamutPlot(A.NSView):
             p, radius, color = labpos(sample['lab']), 9-index*2, COLORS[ROLES.index(sample['role'])]
             marker = A.NSBezierPath.bezierPathWithOvalInRect_(R(p.x-radius, p.y-radius, radius*2, radius*2))
             color.setFill(); marker.fill(); A.NSColor.whiteColor().setStroke(); marker.setLineWidth_(1.2); marker.stroke()
-            text(str(index+1), p.x+12, p.y+16-index*15, color)
+            text('1' if sample['role']=='source' else '2', p.x+12, p.y+16-index*15, color)
 
 
 class GamutWindow:
@@ -399,9 +400,18 @@ class GamutWindow:
         self.canvas.setNeedsDisplay_(True)
 
     def direction_text(self):
+        return self.direction_description()+'\n'+self.ui.text('Svaga, tunna pilar = sällsynta färger. Starka pilar = vanligare färger. Pilens längd visar färgskillnaden, inte hur vanlig färgen är.')
+
+    def direction_description(self):
         ui=self.ui
         if self.compare_reference.state() and self.plot.data.get('referenceCloud'):
             return ui.text('Gul pil: vänster bild → höger bild. Pilspetsen visar högerbildens färg.')
+        if self.owner.workflow=='printers':
+            points=ui.text(ROLE_KEYS[ROLES.index(self.cloud.role)])
+            text=ui.text('Punkter: %@. Gula pilar: original → utskrift. Pilens början är originalfärgen; pilspetsen är skrivarens beräknade färg.',points)
+            if not self.movement.state():
+                text+='\n'+ui.text('Markera Visa förflyttning för att visa pilarna.')
+            return text
         text=ui.text('Gula pilar: tidigare läge → nytt läge. Pilspetsen visar resultatet efter byte av färgrymd eller andra inställningar.')
         if not self.movement.state():
             text=ui.text('Markera Visa förflyttning för gula pilar från tidigare läge till nytt läge vid byte av färgrymd eller inställningar.')
@@ -433,7 +443,7 @@ class GamutWindow:
         self.update_hint()
 
     def change_roles(self, sender=None):
-        self.plot.visible_roles = {role for role, button in zip(ROLES, self.toggles) if button.state()}
+        self.plot.visible_roles = {role for role, button in zip(ROLES, self.toggles) if button.state() and not button.isHidden()}
         self.change_lightness()
 
     def change_background(self, sender=None):
@@ -466,22 +476,31 @@ class GamutWindow:
         if self.is3d:
             cloud=self.plot.data.get('cloud',{})
             self.ui.message(self.hint, '3D: %@ vanliga färggrupper ur %@ samplade pixlar. Dra för att rotera, rulla för att zooma. Pilar visar föregående → nytt läge.', len(cloud.get('ids',[])), cloud.get('sampled',0))
+            if self.owner.workflow=='printers':
+                self.ui.message(self.hint, '3D: %@ färggrupper. Dra för att rotera, rulla för att zooma. Pilar: original → utskrift, oavsett valda punkter.',len(cloud.get('ids',[])))
             if self.compare_reference.state():
-                self.ui.message(self.hint, 'Vänster: %@ → Höger: %@', Path(self.owner.reference_request.get('printer','')).name or self.ui.text('Arbetsfärgrymd:'), Path(self.owner.printer or '').name or self.ui.text('Arbetsfärgrymd:'))
+                self.ui.message(self.hint, 'Vänster: %@ → Höger: %@', Path(self.owner.reference_request.get('printer','')).name or self.owner.reference_caption().split(' · ')[0], Path(self.owner.printer or '').name or self.owner.proof_caption().split(' · ')[0])
         else:
             self.ui.message(self.hint, 'Kulörguide: a*/b* vid L*=%@. L* 0 är svart, 100 är vitt. Endast bakgrunden ändras; konturer och färgprov är oförändrade.', f'{value:.1f}')
 
     def update(self, response):
         self.plot.update(response)
-        stages={s['role'] for s in response.get('cloud',{}).get('stages',[])}
-        for i,role in enumerate(ROLES): self.cloud_role.itemAtIndex_(i).setEnabled_(role in stages)
+        available={'source','printer'} if self.owner.workflow=='printers' else {'source','working'}
+        stages={s['role'] for s in response.get('cloud',{}).get('stages',[])} & available
+        for role,toggle in zip(ROLES,self.toggles): toggle.setHidden_(role not in available)
+        self.plot.visible_roles={role for role,toggle in zip(ROLES,self.toggles) if role in available and toggle.state()}
+        for i,role in enumerate(ROLES):
+            self.cloud_role.itemAtIndex_(i).setEnabled_(role in stages)
+            self.cloud_role.itemAtIndex_(i).setHidden_(role not in available)
         if ROLES[self.cloud_role.indexOfSelectedItem()] not in stages and stages:
-            self.cloud_role.selectItemAtIndex_(1)
+            self.cloud_role.selectItemAtIndex_(2 if 'printer' in stages else 1 if 'working' in stages else 0)
         self.change_cloud(); ui = self.ui
         def message():
             pixel = response.get('pixel')
             text = (ui.text('Originalpixel x=%@, y=%@ · Pilar: original → arbetsfärgrymd → förväntad utskrift', pixel[0]+1, pixel[1]+1)
                     if pixel else ui.text('Klicka i någon av bildvyerna för att följa en färg.'))
+            if pixel and self.owner.workflow=='printers': text=ui.text('Originalpixel x=%@, y=%@ · Pilar: original → förväntad utskrift',pixel[0]+1,pixel[1]+1)
+            elif pixel: text=ui.text('Originalpixel x=%@, y=%@ · Pilar: original → arbetsfärgrymd',pixel[0]+1,pixel[1]+1)
             if self.is3d and pixel: text=ui.text('Originalpixel x=%@, y=%@',pixel[0]+1,pixel[1]+1)
             if 'alpha' in response: text += ui.text(' · Alfa %@/%@ (prov före bakgrundsblandning)', response['alpha'], response.get('alphaMax',255))
             return text
@@ -491,12 +510,13 @@ class GamutWindow:
             name_width=max(len(ui.text(key)) for key in ROLE_KEYS)
             channel_width=5 if response.get('bits',8)==16 else 3
             for sample in response.get('points', []):
+                if sample['role'] not in available: continue
                 name = ui.text(ROLE_KEYS[ROLES.index(sample['role'])]); l, a, b = sample['lab']
                 channels="["+", ".join(f"{v:>{channel_width}}" for v in sample['channels'])+"]"
                 rows.append(f"{name:<{name_width}}  L* {l:6.2f}  a* {a:7.2f}  b* {b:7.2f}  ΔE76 {sample['deltaE76']:6.2f}  {sample['mode']:<4} {channels}")
             return '\n'.join(rows)
         ui.bind(self.values, values)
-        ui.bind(self.profiles, lambda: '\n'.join(f"{ui.text(ROLE_KEYS[ROLES.index(p['role'])])}: {p['name']}" for p in response.get('profiles', [])))
+        ui.bind(self.profiles, lambda: '\n'.join(f"{ui.text(ROLE_KEYS[ROLES.index(p['role'])])}: {p['name']}" for p in response.get('profiles', []) if p['role'] in available))
 
 
 def make_window(w, h):
@@ -531,6 +551,9 @@ class Delegate(A.NSObject):
             self.owner.exit_code = 1
             self.owner.stop()
             os._exit(1)
+    def tabView_didSelectTabViewItem_(self, tabview, item):
+        if hasattr(self.owner,'save'): self.owner.change_workflow(str(item.identifier()))
+
     def applicationShouldTerminate_(self, app):
         process = self.owner.processes.get('save')
         if process is None or process.poll() is not None:
@@ -563,6 +586,8 @@ class Controller:
         self.closing = False; self.ready = False; self.exporting = False
         self.path = self.printer = self.pixel = None
         self.reference_request = None
+        self.source_prompt_pending = False
+        self.workflow = 'spaces'; self.workflow_states = {}
         self.gamut = None; self.original = self.proof = self.reference = None
         self.original_caption = self.proof_caption = self.reference_caption = lambda: ''
         self.original_size = (1, 1); self.syncing = False
@@ -589,6 +614,7 @@ class Controller:
             print('PASS: Python app startup, native windows, saved language and architecture:', self.runtime, flush=True)
             A.NSApplication.sharedApplication().terminate_(None); return
         if self.args.smoke_test:
+            self.tabs.selectTabViewItemWithIdentifier_('printers')
             self.path, self.printer, self.smoke_output = self.args.smoke_test
             self.ui.bind(self.image_label, lambda: Path(self.path).name)
             self.ui.bind(self.printer_label, lambda: Path(self.printer).name)
@@ -608,6 +634,28 @@ class Controller:
         body.addArrangedSubview_(stack([ui.label('Jämför färgrymd och utskrift', size=23), ui.label('Språk / Language:'), self.language]))
         self.image_label = ui.label('Ingen bild vald')
         body.addArrangedSubview_(stack([button(ui, 'Öppna bild…', self.open_image), self.image_label]))
+        self.tab_buttons=[button(ui,key,lambda _,identifier=identifier:self.select_workflow(identifier)) for identifier,key in (('spaces','1 Färgrymder'),('printers','2 Skrivarprofiler'))]
+        for control in self.tab_buttons:
+            control.setButtonType_(A.NSPushOnPushOffButton)
+            control.widthAnchor().constraintEqualToConstant_(200).setActive_(True)
+        body.addArrangedSubview_(stack(self.tab_buttons))
+        self.tabs=A.NSTabView.alloc().initWithFrame_(R(0,0,1000,36))
+        self.tabs.setTabViewType_(A.NSNoTabsNoBorder)
+        self.tabs.heightAnchor().constraintEqualToConstant_(36).setActive_(True)
+        for identifier,key,hint in (
+            ('spaces','1 Färgrymder','Välj en arbetsfärgrymd för höger bild. Originalet visas till vänster. Utforska färgerna i 2D eller 3D.'),
+            ('printers','2 Skrivarprofiler','Välj en skrivarprofil för höger bild. Jämför med originalet eller välj en andra skrivarprofil.')):
+            item=A.NSTabViewItem.alloc().initWithIdentifier_(identifier)
+            ui.bind(item,lambda key=key:ui.text(key),'setLabel_')
+            content=A.NSView.alloc().initWithFrame_(R(0,0,1000,36))
+            label=ui.label(hint,True,12);label.setTranslatesAutoresizingMaskIntoConstraints_(False);content.addSubview_(label)
+            label.leadingAnchor().constraintEqualToAnchor_(content.leadingAnchor()).setActive_(True)
+            label.trailingAnchor().constraintEqualToAnchor_(content.trailingAnchor()).setActive_(True)
+            label.centerYAnchor().constraintEqualToAnchor_(content.centerYAnchor()).setActive_(True)
+            item.setView_(content)
+            self.tabs.addTabViewItem_(item)
+        body.addArrangedSubview_(self.tabs)
+        self.tabs.widthAnchor().constraintEqualToAnchor_constant_(body.widthAnchor(),-32).setActive_(True)
         names = list(self.profile_paths)
         # Keep the familiar order while storing paths independently of labels.
         names = [name for name in ('sRGB', 'Adobe RGB (1998)', 'Display P3', 'ProPhoto RGB') if name in names]
@@ -615,25 +663,37 @@ class Controller:
         self.working_paths = self.source_paths.copy()
         self.source = popup(ui, ['Inbäddad profil (om den finns)']+names, self.settings_changed)
         self.working = popup(ui, ['Behåll bildens färgrymd']+names, self.settings_changed)
-        body.addArrangedSubview_(stack([ui.label('Källprofil för bild utan profil:'), self.source, button(ui, 'Annan källprofil…', lambda _: self.choose_profile('source'))]))
+        self.source_row=stack([ui.label('Källprofil för bild utan profil:'), self.source, button(ui, 'Annan källprofil…', lambda _: self.choose_profile('source'))])
+        body.addArrangedSubview_(self.source_row)
         self.working_label=ui.label('Arbetsfärgrymd:')
-        body.addArrangedSubview_(stack([self.working_label, self.working, button(ui, 'Annan färgrymd…', lambda _: self.choose_profile('working'))]))
+        self.working_row=stack([self.working_label, self.working])
+        self.custom_working=button(ui, 'Annan färgrymd…', lambda _: self.choose_profile('working'))
         self.printer_label = ui.label('Välj skrivarens och papperets ICC-profil')
-        body.addArrangedSubview_(stack([button(ui, 'Välj skrivar-/pappersprofil…', lambda _: self.choose_profile('printer')), self.printer_label]))
+        self.printer_row=stack([button(ui, 'Välj skrivar-/pappersprofil…', lambda _: self.choose_profile('printer')), self.printer_label])
+        body.addArrangedSubview_(self.printer_row)
         self.intent = popup(ui, ('Relativ kolorimetrisk', 'Absolut kolorimetrisk', 'Perceptuell'), self.settings_changed)
         self.bpc = button(ui, 'Svartpunktskompensation', self.settings_changed, True); self.bpc.setState_(A.NSControlStateValueOn)
         self.paper = button(ui, 'Simulera pappersvitt', self.settings_changed, True)
         self.ink = button(ui, 'Simulera trycksvärta', self.settings_changed, True); self.ink.setState_(A.NSControlStateValueOn)
-        body.addArrangedSubview_(stack([ui.label('Återgivning:'), self.intent, self.bpc, self.ink, self.paper]))
+        self.render_settings=stack([stack([ui.label('Återgivning:'),self.intent]),stack([self.bpc,self.ink,self.paper])],vertical=True)
+        self.print_render_container=stack([],vertical=True)
+        body.addArrangedSubview_(self.print_render_container)
         self.pin = button(ui, 'Lås simulering som referens', self.pin_reference)
         self.compare = button(ui, 'Jämför med annan profil…', self.compare_profile)
+        self.compare.setEnabled_(False)
         self.unpin = button(ui, 'Återställ vänster till original', self.clear_reference)
         self.swap = button(ui, 'Byt vänster ↔ höger', self.swap_comparison)
         self.swap.setEnabled_(False)
         self.pin.setEnabled_(False); self.unpin.setEnabled_(False)
         self.zoom = popup(ui, ('Anpassa', '25 %', '50 %', '100 %'), self.update_zoom)
-        body.addArrangedSubview_(stack([self.pin, self.compare]))
+        self.comparison_actions=stack([self.pin,self.compare])
+        body.addArrangedSubview_(self.comparison_actions)
         body.addArrangedSubview_(stack([self.swap, self.unpin, ui.label('Gemensam zoom:'), self.zoom]))
+        self.colour_controls=stack([self.working_row,self.custom_working],vertical=True)
+        self.colour_controls_row=stack([A.NSView.alloc().initWithFrame_(R(0,0,1,1)),self.colour_controls],spacing=14)
+        self.colour_controls_row.setDistribution_(A.NSStackViewDistributionFillEqually)
+        body.addArrangedSubview_(self.colour_controls_row)
+        self.colour_controls_row.widthAnchor().constraintEqualToAnchor_constant_(body.widthAnchor(),-32).setActive_(True)
         self.left, self.right = (Pane.alloc().initWithFrame_(R(0, 0, 600, 360)) for _ in range(2))
         panes = stack([self.left, self.right], spacing=14); panes.setDistribution_(A.NSStackViewDistributionFillEqually)
         panes.heightAnchor().constraintGreaterThanOrEqualToConstant_(260).setActive_(True)
@@ -671,7 +731,69 @@ class Controller:
             clip = pane.scroll.contentView(); clip.setPostsBoundsChangedNotifications_(True)
             F.NSNotificationCenter.defaultCenter().addObserver_selector_name_object_(self.delegate, 'synchronizeScroll:', A.NSViewBoundsDidChangeNotification, clip)
         self.build_menu()
+        self.refresh_workflow(); self.tabs.setDelegate_(self.delegate)
         self.window.center(); self.window.makeKeyAndOrderFront_(None); self.screen_changed()
+
+    def select_workflow(self, workflow):
+        self.tabs.selectTabViewItemWithIdentifier_(workflow)
+        self.refresh_workflow()
+
+    def workflow_state(self):
+        return dict(source=self.source.indexOfSelectedItem(),working=self.working.indexOfSelectedItem(),
+                    printer=self.printer,intent=self.intent.indexOfSelectedItem(),bpc=self.bpc.state(),
+                    paper=self.paper.state(),ink=self.ink.state(),reference=self.reference,
+                    reference_request=self.reference_request,reference_caption=self.reference_caption,
+                    compare3d=bool(self.gamut and self.gamut.compare_reference.state()))
+
+    def change_workflow(self, workflow):
+        if workflow==self.workflow: return
+        self.workflow_states[self.workflow]=self.workflow_state()
+        state=self.workflow_states.get(workflow,dict(source=self.source.indexOfSelectedItem(),working=0,
+            printer=None,intent=0,bpc=1,paper=0,ink=1,reference=None,reference_request=None,
+            reference_caption=lambda:'',compare3d=False))
+        self.workflow=workflow
+        self.source.selectItemAtIndex_(state['source']); self.working.selectItemAtIndex_(state['working'])
+        self.printer=state['printer']; self.intent.selectItemAtIndex_(state['intent'])
+        self.bpc.setState_(state['bpc']); self.paper.setState_(state['paper']); self.ink.setState_(state['ink'])
+        if workflow=='spaces': state.update(reference=None,reference_request=None,reference_caption=lambda:'',compare3d=False)
+        self.reference=state['reference']; self.reference_request=state['reference_request']
+        self.reference_caption=state['reference_caption']
+        self.ui.bind(self.printer_label,lambda:Path(self.printer).name if self.printer else self.ui.text('Välj skrivarens och papperets ICC-profil'))
+        self.unpin.setEnabled_(self.reference is not None)
+        self.left.set_image(self.reference if self.reference is not None else None,self.original_size)
+        self.ui.bind(self.left.detail,self.reference_caption if self.reference is not None else self.original_caption)
+        self.ui.message(self.left.heading,'Låst referens' if self.reference is not None else 'Original')
+        self.right.set_image(None,self.original_size)
+        if self.gamut:
+            self.gamut.compare_reference.setState_(state['compare3d'])
+            self.gamut.plot.data={};self.gamut.plot.previous=[];self.gamut.plot.setNeedsDisplay_(True)
+            self.gamut.cloud.update_cloud({},[])
+            self.gamut.update_hint()
+        self.refresh_workflow();self.settings_changed()
+
+    def refresh_workflow(self):
+        printing=self.workflow=='printers'
+        for index,control in enumerate(self.tab_buttons): control.setState_(index==int(printing))
+        self.printer_row.setHidden_(not printing)
+        self.working_row.setHidden_(printing)
+        self.colour_controls_row.setHidden_(printing)
+        self.print_render_container.setHidden_(not printing)
+        destination=self.print_render_container if printing else self.colour_controls
+        parent=self.render_settings.superview()
+        if parent is not destination:
+            if parent is not None:
+                parent.removeArrangedSubview_(self.render_settings); self.render_settings.removeFromSuperview()
+            destination.addArrangedSubview_(self.render_settings)
+        self.paper.setHidden_(not printing);self.ink.setHidden_(not printing)
+        self.compare.setHidden_(not printing);self.pin.setHidden_(True)
+        self.comparison_actions.setHidden_(not printing)
+        self.swap.setHidden_(not printing);self.unpin.setHidden_(not printing)
+        self.ui.bind(self.pin,lambda:self.ui.text('Lås färgrymden till vänster'),'setTitle_')
+        self.save.setHidden_(not printing)
+        self.ui.message(self.right.heading,'Simulerad utskrift' if printing else 'Efter byte av färgrymd')
+        self.ui.bind(self.gamut_button,lambda:self.ui.text('Färgomfång…'),'setTitle_')
+        if self.gamut:
+            self.ui.bind(self.gamut.window,lambda:self.ui.text('SoftProf · Skrivarprofiler · 2D / 3D' if self.workflow=='printers' else 'SoftProf · Färgrymder · 2D / 3D'),'setTitle_')
 
     def build_menu(self):
         ui = self.ui; main = A.NSMenu.alloc().init()
@@ -728,6 +850,10 @@ class Controller:
         path = self.dialog('Öppna bild', True)
         if not path: return
         self.path = path; self.source.selectItemAtIndex_(0); self.pixel = None
+        self.source_prompt_pending = True
+        self.source_row.setHidden_(False)
+        for state in self.workflow_states.values():
+            state.update(reference=None,reference_request=None,reference_caption=lambda:'',compare3d=False,source=0)
         self.reference_request = None
         if self.gamut: self.gamut.compare_reference.setState_(0)
         self.original = self.proof = self.reference = None
@@ -740,6 +866,29 @@ class Controller:
             self.gamut.cloud.update_cloud({}, [])
             self.gamut.update_hint()
         self.settings_changed()
+
+    def prompt_source_profile(self):
+        alert = A.NSAlert.alloc().init()
+        alert.setMessageText_(self.ui.text('Bilden saknar ICC-profil'))
+        alert.setInformativeText_(self.ui.text('Välj den källprofil som bilden skapades med. Profilen används för visningen; originalfilen ändras inte.'))
+        choices = A.NSPopUpButton.alloc().initWithFrame_pullsDown_(R(0, 0, 360, 28), False)
+        choices.addItemWithTitle_(self.ui.text('Välj källprofil…'))
+        for index in range(1, len(self.source_paths)):
+            choices.addItemWithTitle_(self.source.itemAtIndex_(index).title())
+        alert.setAccessoryView_(choices)
+        apply = alert.addButtonWithTitle_(self.ui.text('Visa bilden'))
+        apply.setEnabled_(False)
+        target = Action.alloc().init()
+        target.callback = lambda _: apply.setEnabled_(choices.indexOfSelectedItem() > 0)
+        choices.setTarget_(target); choices.setAction_('action:')
+        alert.addButtonWithTitle_(self.ui.text('Annan källprofil…'))
+        alert.addButtonWithTitle_(self.ui.text('Avbryt'))
+        result = alert.runModal()
+        if result == A.NSAlertFirstButtonReturn and choices.indexOfSelectedItem() > 0:
+            self.source.selectItemAtIndex_(choices.indexOfSelectedItem())
+            self.settings_changed()
+        elif result == A.NSAlertSecondButtonReturn:
+            self.choose_profile('source')
 
     def choose_profile(self, role):
         key = {'source':'Välj källprofil', 'working':'Välj arbetsfärgrymdens ICC-profil','printer':'Välj skrivarens och papperets ICC-profil'}[role]
@@ -756,24 +905,27 @@ class Controller:
         request = dict(image=self.path, intent=(1,3,0)[self.intent.indexOfSelectedItem()], bpc=bool(self.bpc.state()), paper=bool(self.paper.state()), ink=bool(self.ink.state()) or bool(self.paper.state()), display=self.profile_paths['Display P3'])
         source, working = self.source_paths[self.source.indexOfSelectedItem()], self.working_paths[self.working.indexOfSelectedItem()]
         if source: request['source'] = source
-        if working: request['working'] = working
-        if self.printer: request['printer'] = self.printer
+        if working and self.workflow=='spaces': request['working'] = working
+        if self.workflow=='printers' and self.printer: request['printer'] = self.printer
+        if self.workflow=='spaces': request.update(paper=False,ink=False)
         return request
 
     def caption(self):
         ui = self.ui
-        working = self.working.titleOfSelectedItem() if self.working.indexOfSelectedItem() else None
+        working = self.working.titleOfSelectedItem() if self.workflow=='spaces' and self.working.indexOfSelectedItem() else None
         printer = Path(self.printer).name if self.printer else None
         intent = ('Relativ kolorimetrisk', 'Absolut kolorimetrisk', 'Perceptuell')[self.intent.indexOfSelectedItem()]
         bpc, paper = bool(self.bpc.state()), bool(self.paper.state())
         ink = bool(self.ink.state()) or paper
-        return lambda: ui.text('%@ → %@\n%@ · BPC %@ · Pappersvitt %@', working or ui.text('Behåll bildens färgrymd'), printer or ui.text('Ingen skrivarprofil'), ui.text(intent), ui.text('på' if bpc else 'av'), ui.text('på' if paper else 'av')) + ui.text(' · Trycksvärta %@', ui.text('på' if ink else 'av'))
+        if self.workflow=='spaces':
+            return lambda:ui.text('Arbetsfärgrymd: %@ · %@ · BPC %@',working or ui.text('Behåll bildens färgrymd'),ui.text(intent),ui.text('på' if bpc else 'av'))
+        return lambda: ui.text('%@ → %@\n%@ · BPC %@ · Pappersvitt %@', ui.text('Original'), printer or ui.text('Ingen skrivarprofil'), ui.text(intent), ui.text('på' if bpc else 'av'), ui.text('på' if paper else 'av')) + ui.text(' · Trycksvärta %@', ui.text('på' if ink else 'av'))
 
     def settings_changed(self, sender=None):
         if self.paper.state(): self.ink.setState_(A.NSControlStateValueOn)
         self.ink.setEnabled_(not self.paper.state())
         self.revisions['render'] += 1; self.revisions['gamut'] += 1
-        self.ready = False; self.pin.setEnabled_(False); self.save.setEnabled_(False); self.swap.setEnabled_(False)
+        self.ready = False; self.compare.setEnabled_(False); self.pin.setEnabled_(False); self.save.setEnabled_(False); self.swap.setEnabled_(False)
         for kind in ('render','gamut'):
             process=self.processes.get(kind)
             if process and process.poll() is None: process.terminate()
@@ -826,11 +978,16 @@ class Controller:
                     self.gamut.plot.data = {}; self.gamut.plot.previous = []; self.gamut.plot.setNeedsDisplay_(True)
                     self.gamut.cloud.update_cloud({}, [])
                     self.ui.message(self.gamut.values, '')
+                if response.get('code') == 'missing_source_profile' and self.source_prompt_pending:
+                    self.source_prompt_pending = False
+                    self.prompt_source_profile()
+                    return
                 if self.args.smoke_test: self.fail_smoke(response.get('error'))
                 return
             def image(name): return A.NSImage.alloc().initWithData_(F.NSData.dataWithContentsOfFile_(str(folder/name)))
             self.original, self.proof = image('original.png'), image('proof.png')
             if self.original is None or self.proof is None: self.fail_smoke('Missing preview data'); return
+            self.source_prompt_pending = False
             self.original_size = (response['width'], response['height'])
             self.image_bits = response.get('bits',8)
             if self.args.smoke_test:
@@ -838,14 +995,15 @@ class Controller:
                 assert (representation.pixelsWide(), representation.pixelsHigh()) == (response['previewWidth'], response['previewHeight'])
                 if self.image_bits==16: assert representation.bitsPerSample() >= 16
             source, embedded = response['source'], response['embedded']
+            self.source_row.setHidden_(embedded)
             self.original_caption = lambda: source+' · '+self.ui.text('inbäddad källprofil' if embedded else 'tilldelad källprofil')+self.ui.text(' · %@ bitar/kanal',response.get('bits',8))
             self.proof_caption = caption
             if self.reference is None:
                 self.left.set_image(self.original, self.original_size); self.ui.bind(self.left.detail, self.original_caption)
             self.right.set_image(self.proof, self.original_size); self.ui.bind(self.right.detail, caption)
             self.ui.message(self.right.heading, 'Simulerad utskrift' if self.printer else 'Efter byte av färgrymd')
-            self.ui.message(self.status, 'Simuleringen är aktuell. Lås den som referens och ändra inställningar för A/B-jämförelse.' if self.printer else 'Färgrymden visas. Välj en skrivar-/pappersprofil för att simulera utskrift.')
-            self.ready = True; self.pin.setEnabled_(True); self.swap.setEnabled_(self.reference_request is not None); self.save.setEnabled_(bool(self.printer) and not self.exporting)
+            self.ui.message(self.status, 'Simuleringen är aktuell. Lås den som referens och ändra inställningar för A/B-jämförelse.' if self.printer else ('Välj arbetsfärgrymd ovan. Öppna Färgomfång för 2D och 3D.' if self.workflow=='spaces' else 'Välj en skrivar-/pappersprofil för höger bild.'))
+            self.ready = True; self.compare.setEnabled_(self.workflow=='printers' and bool(self.printer)); self.pin.setEnabled_(True); self.swap.setEnabled_(self.reference_request is not None); self.save.setEnabled_(bool(self.printer) and not self.exporting)
             self.update_zoom(); self.schedule_gamut()
             if self.args.smoke_test: self.smoke_rendered()
         self.worker('render', {**self.request(),'previewLimit':1600,'originalCache':str(self.temporary/'original-cache'),'renderCache':str(self.temporary/'render-cache')}, done)
@@ -869,7 +1027,7 @@ class Controller:
         finally: self.syncing = False
 
     def compare_profile(self, sender=None):
-        if not self.ready or not self.printer:
+        if not self.ready or not self.printer or self.workflow!='printers':
             return
         path = self.dialog('Välj skrivar-/pappersprofil…')
         if not path:
@@ -880,7 +1038,7 @@ class Controller:
         self.settings_changed()
 
     def pin_reference(self, sender=None):
-        if not self.ready: return
+        if not self.ready or self.workflow!='printers': return
         self.reference = self.proof.copy(); self.reference_caption = self.proof_caption
         self.reference_request = self.request().copy()
         if self.gamut: self.schedule_gamut()
@@ -888,7 +1046,7 @@ class Controller:
         self.ui.message(self.left.heading, 'Låst referens'); self.unpin.setEnabled_(True); self.swap.setEnabled_(True); self.update_zoom()
 
     def swap_comparison(self, sender=None):
-        if not self.ready or self.reference_request is None:
+        if not self.ready or self.reference_request is None or self.workflow!='printers':
             return
         previous = self.reference_request.copy()
         self.reference = self.proof.copy()
@@ -919,7 +1077,7 @@ class Controller:
 
     def show_gamut(self, sender=None):
         if self.gamut is None: self.gamut = GamutWindow(self)
-        self.gamut.window.makeKeyAndOrderFront_(None); self.schedule_gamut()
+        self.refresh_workflow(); self.gamut.window.makeKeyAndOrderFront_(None); self.schedule_gamut()
 
     def pick_color(self, x, y):
         if not self.ready: return
@@ -951,7 +1109,7 @@ class Controller:
         self.worker('gamut', request, done)
 
     def export_image(self, sender=None):
-        if not self.ready or not self.printer or self.exporting: return
+        if not self.ready or not self.printer or self.exporting or self.workflow!='printers': return
         panel = A.NSSavePanel.savePanel(); panel.setTitle_(self.ui.text('Spara bild konverterad till skrivarprofilen'))
         panel.setPrompt_(self.ui.text('Spara')); panel.setAllowedFileTypes_(['tif','tiff','png'] if getattr(self,'image_bits',8)==16 else ['tif','tiff','png','jpg','jpeg'])
         panel.setNameFieldStringValue_(Path(self.path).stem+('_print.tif' if self.ui.language=='en' else '_utskrift.tif'))
@@ -1011,17 +1169,16 @@ class Controller:
 
     def smoke_gamut(self, response):
         if self.smoke_phase == 2:
-            self.smoke_channels = response['points'][1]['channels']; self.smoke_phase = 3
-            self.working.selectItemAtIndex_(2); self.settings_changed(); return
+            self.smoke_channels = response['points'][2]['channels']; self.smoke_phase = 3
+            self.intent.selectItemAtIndex_(0); self.bpc.setState_(1); self.settings_changed(); return
         if self.smoke_phase != 3: return
         self.smoke_phase = 4
         assert self.gamut.plot.lab_space is not None, 'Missing colour-managed Lab background'
         assert len(self.gamut.plot.previous) == 3
-        assert response['points'][1]['channels'] != self.smoke_channels
+        assert response['points'][2]['channels'] != self.smoke_channels
         assert len(response['profiles']) == len(response['points']) == 3
-        assert self.gamut.previous_cloud_context[0] != self.gamut.cloud_context[0]
-        assert self.gamut.previous_cloud_context[0] in self.gamut.direction.stringValue()
-        assert self.gamut.cloud_context[0] in self.gamut.direction.stringValue()
+        assert '→' in self.gamut.direction.stringValue()
+        assert self.gamut.cloud.arrow_pair is not None
         import time
         import numpy as np
         cloud=self.gamut.cloud
@@ -1039,7 +1196,7 @@ class Controller:
             assert self.request() == before and self.pixel == pixel
             assert bytes(self.reference.TIFFRepresentation()) == reference
             assert self.bpc.title() == self.ui.text('Svartpunktskompensation')
-            assert self.ui.text('2 Arbetsfärgrymd') in self.gamut.values.stringValue()
+            assert self.ui.text('2 Arbetsfärgrymd') not in self.gamut.values.stringValue()
             assert self.working_label.stringValue().rstrip(':') == self.ui.text('2 Arbetsfärgrymd').split(' ',1)[1]
             rows=self.gamut.values.stringValue().splitlines()
             for token in ('L*','a*','b*','ΔE76'):

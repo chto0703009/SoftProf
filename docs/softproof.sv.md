@@ -1,6 +1,6 @@
 # SoftProf
 
-Handbok - version 2.4.7 - 6 november 2026
+Handbok - version 2.5.2 - 7 november 2026
 
 Christer Törnkvist - christer@borgasundsfotografiska.se
 GNU GPL version 3 eller senare (GPL-3.0-or-later).
@@ -11,7 +11,7 @@ SoftProf jämför en bild med en beräknad simulering av dess utskrift. Du kan u
 
 ### Installera appen
 
-Öppna `SoftProf-2.4.7-macos.dmg`, välj **Apple Silicon** eller **Intel** efter datorns processor och dra den appen till **Applications / Program**, mata ut skivavbilden och starta appen från Program. DMG-filen har två märkta appar: **Apple Silicon kräver macOS 14+; Intel kräver macOS 13 Ventura+**. Apple Silicon är ARM64; Intel är x86_64. Alla Intel-binärer kontrolleras mot Venturas systemkrav. Fysisk Ventura-maskin har inte testats här. Installera bara rätt app för din dator. Python och nödvändiga bibliotek ingår; utvecklingsprojektet behövs inte.
+Öppna `SoftProf-2.5.2-macos.dmg`, välj **Apple Silicon** eller **Intel** efter datorns processor och dra den appen till **Applications / Program**, mata ut skivavbilden och starta appen från Program. DMG-filen har två märkta appar: **Apple Silicon kräver macOS 14+; Intel kräver macOS 13 Ventura+**. Apple Silicon är ARM64; Intel är x86_64. Alla Intel-binärer kontrolleras mot Venturas systemkrav. Fysisk Ventura-maskin har inte testats här. Installera bara rätt app för din dator. Python och nödvändiga bibliotek ingår; utvecklingsprojektet behövs inte.
 
 Paketet är ad hoc-signerat men saknar Developer ID-signering och Apple-notarisering. Om macOS blockerar första starten, granska appen i **Systeminställningar > Integritet och säkerhet > Öppna ändå**. DMG-filen innehåller båda handböckerna, GPL-licensen och appens källkod.
 
@@ -28,11 +28,11 @@ Bilddialogen börjar på Skrivbordet och ICC-dialogen i `/Library/ColorSync/Prof
 
 ### Börja med en känd bild
 
-Välj **Öppna bild**, välj sedan arbetsfärgrymd och skrivar-/pappersprofil. Originalet visas till vänster och den aktuella simuleringen till höger. En bild utan profil behöver en uttryckligen vald källprofil för att dess färger ska kunna tolkas.
+Välj **Öppna bild** och sedan flik. **1 Färgrymder** jämför originalet med vald arbetsfärgrymd. **2 Skrivarprofiler** jämför originalet med en skrivarprofil eller två skrivarprofiler med varandra. För en bild utan profil öppnas en dialog: välj bildens verkliga källprofil eller en egen ICC-fil och klicka **Visa bilden**. Efter Avbryt kan källprofilen väljas i huvudfönstret; källprofilvalet döljs när bilden har inbäddad ICC.
 
 <!-- pipeline -->
 
-Konverteringskedjan är: **källprofil > arbetsfärgrymd > skrivar-/pappersprofil**. En separat visningskonvertering förbereder simuleringen för skärmen; macOS ColorSync anpassar den profilmärkta bilden till aktuell bildskärm.
+Flikarna använder separata vägar: **källprofil > arbetsfärgrymd** respektive **källprofil > skrivarprofil**. Skrivarjämförelsen använder inte arbetsfärgrymden från den andra fliken. En separat visningskonvertering förbereder simuleringen för skärmen; macOS ColorSync anpassar den profilmärkta bilden till aktuell bildskärm.
 
 ### Använd rätt fysisk uppsättning
 
@@ -42,11 +42,11 @@ Välj ICC-profil för den verkliga skrivaren, papperet, bläcket och drivrutinsi
 
 ### Källprofil och arbetsfärgrymd
 
-**Arbetsfärgrymd** i huvudfönstret är samma steg som **2 Arbetsfärgrymd** i färgomfångsfönstret.
+I **1 Färgrymder** väljer du **Arbetsfärgrymd**. Färgomfångsfönstret visar källfärg och arbetsfärgrymd. I **2 Skrivarprofiler** väljer du skrivarens och papperets ICC-profil; färgomfångsfönstret visar källfärg och utskriftsfärg.
 
 En inbäddad ICC-profil används alltid som källa. För en bild utan profil väljer du den profil som verkligen beskriver bildens lagrade värden. Denna tilldelade tolkning ändrar inte originalfilen. Fel källprofil ändrar innebörden av alla färger.
 
-Menyn erbjuder sRGB, Adobe RGB (1998), Display P3, ProPhoto RGB och en egen ICC-profil. ProPhoto RGB använder systemprofilen ROMM RGB i macOS. **Behåll bildens färgrymd** undviker en onödig omräkning via arbetsfärgrymd. Vald återgivningsmetod och svartpunktskompensation används både vid konvertering till arbetsfärgrymden och därifrån till skrivarprofilen.
+Menyn erbjuder sRGB, Adobe RGB (1998), Display P3, ProPhoto RGB och en egen ICC-profil. ProPhoto RGB använder systemprofilen ROMM RGB i macOS. **Behåll bildens färgrymd** undviker en onödig omräkning via arbetsfärgrymd. Återgivningsmetod och svartpunktskompensation gäller konverteringen i aktiv flik. Pappersvitt och trycksvärta finns bara i Skrivarprofiler.
 
 | Återgivningsmetod | Praktisk innebörd |
 | --- | --- |
@@ -72,13 +72,13 @@ Förhandsvisningen är en ICC-märkt Display P3-bild som visas genom macOS AppKi
 
 ### Jämförelse sida vid sida
 
-Vänster vy börjar som originalet tolkat med källprofilen. Höger vy följer den aktuella arbetsfärgrymden och skrivarinställningarna. Utan skrivarprofil visar höger vy enbart arbetsfärgrymdens konvertering.
+Båda flikarna börjar med originalet till vänster. I Färgrymder visar höger bild vald arbetsfärgrymd; i Skrivarprofiler visar den vald utskriftssimulering. Varje flik behåller sina inställningar när du växlar. I Färgrymder är vänsterbilden alltid originalet. Arbetsfärgrymd, återgivningsmetod och svartpunktskompensation ligger samlade ovanför högerbilden. Bara Skrivarprofiler kan låsa en referens; en ny bild rensar den.
 
-Välj **Lås simulering som referens** för att behålla resultat A till vänster. Ändra profiler, återgivningsmetod eller kompensation för att skapa resultat B till höger. Referensens bildtext bevarar inställningarna som användes för A. **Återställ vänster till original** visar originalbilden till vänster och behåller högerbildens aktuella profil och inställningar.
+I Färgrymder ändrar du valen ovanför högerbilden och jämför effekten med originalet som alltid ligger till vänster. I Skrivarprofiler använder du **Jämför med annan profil…** för att låsa aktuell simulering och välja en andra skrivarprofil. Referensens bildtext bevarar dess inställningar. **Återställ vänster till original** visar originalbilden till vänster och behåller högerbildens aktuella profil och inställningar.
 
-**Jämför med annan profil…** låser aktuell simulering till vänster och öppnar profilvalet för den högra simuleringen. Bildtexterna visar respektive profil och inställningar. Fortsatta ändringar påverkar höger bild; vänster förblir låst.
+Bildtexterna visar respektive profil och inställningar. Fortsatta ändringar påverkar höger bild; vänster förblir låst.
 
-**Byt vänster ↔ höger** byter plats på simuleringarna tillsammans med deras profiler, arbetsfärgrymd, återgivningsmetod, BPC och pappers-/svärtinställningar. Höger sida kan redigeras; vänster förblir låst. Två byten återställer jämförelsens utgångsläge.
+I Skrivarprofiler byter **Byt vänster ↔ höger** plats på simuleringarna tillsammans med deras profiler, arbetsfärgrymd, återgivningsmetod, BPC och pappers-/svärtinställningar. Höger sida kan redigeras; vänster förblir låst. Två byten återställer jämförelsens utgångsläge.
 
 ### Zoom och rullning
 
@@ -96,7 +96,7 @@ Klick i en låst referens följer fortfarande originalpixeln genom de **aktuella
 
 ### Läs värdena för varje steg
 
-Färgomfångsfönstret redovisar källvärden, arbetsfärgrymd och förväntade skrivarvärden. RGB- eller CMYK-värden kan ändras medan Lab-positionen ligger nästan stilla: en färgbevarande konvertering försöker bevara färgen, inte samma tal. En förflyttning visar en beräknad färgändring, exempelvis genom ommappning till annat omfång eller kvantisering.
+Färgomfångsfönstret redovisar källvärden och arbetsfärgrymd i första fliken, samt källvärden och förväntade skrivarvärden i den andra. RGB- eller CMYK-värden kan ändras medan Lab-positionen ligger nästan stilla: en färgbevarande konvertering försöker bevara färgen, inte samma tal. En förflyttning visar en beräknad färgändring, exempelvis genom ommappning till annat omfång eller kvantisering.
 
 ## 4. Läs färgomfångsdiagrammet
 
@@ -106,7 +106,7 @@ Alla profiler jämförs i **CIELAB D50**. Den vanliga 2D-vyn visar a*/b*-planet 
 
 ### Konturer, punkter och pilar
 
-Konturerna visar käll-, arbets- och skrivarprofil. Dölj dem var för sig för en tydligare vy. Numrerade punkter och pilar följer **original > arbetsfärgrymd > förväntad utskrift**. Grå ringar visar föregående inställning för samma pixel.
+Konturerna visar profilerna i aktiv flik. Numrerade punkter och pilar följer **original > arbetsfärgrymd** eller **original > förväntad utskrift**. Dölj konturer var för sig för en tydligare vy. Grå ringar visar föregående inställning för samma pixel.
 
 Sifferraderna visar L*, a*, b*, kanalvärden och **ΔE76 från originalet**. Lab beräknas genom LittleCMS med flyttalsutgång och fast absolut D50-kolorimetri. Kanalomräkningen följer samma 8- eller 16-bitarsflöde som exporten. Skrivarens punkt är profilens förutsägelse, inte en uppmätt utskrift. Skärmprofilen och reglaget för pappersvitssimulering ingår inte i dessa analyskoordinater.
 
@@ -122,9 +122,11 @@ L*, a*, b* och ΔE visas i fasta, linjerade kolumner. Diagrammets ritning hålls
 
 ## 5. 3D-färgrymd och förflyttning
 
-Välj **Visa 3D-färgrymd**; **Visa 2D** återgår till diagrammet. Välj **Original**, **Arbetsfärgrymd** eller **Utskrift** i 3D-vyns meny. Dra för att rotera, rulla för att zooma eller välj **Återställ 3D-vy**. L* ökar uppåt mot ljusare färger, a* går från grönt (negativt) till rött (positivt) och b* från blått (negativt) till gult (positivt). Följ axlarnas märkning när vyn roteras. Bildens valda pixel markeras med en vit ring i valt steg. L*-reglaget för bakgrunden gäller bara 2D.
+Välj **Visa 3D-färgrymd**; **Visa 2D** återgår till diagrammet. Välj **Original** och **Arbetsfärgrymd** i första fliken, eller **Original** och **Utskrift** i den andra. Dra för att rotera, rulla för att zooma eller välj **Återställ 3D-vy**. L* ökar uppåt mot ljusare färger, a* går från grönt (negativt) till rött (positivt) och b* från blått (negativt) till gult (positivt). Följ axlarnas märkning när vyn roteras. Bildens valda pixel markeras med en vit ring i valt steg. L*-reglaget för bakgrunden gäller bara 2D.
 
-Markera **Visa förflyttning** och ändra arbetsfärgrymd, skrivarprofil, återgivningsmetod eller BPC i huvudfönstret. Samma representanter animeras från föregående till nya lägen; tydligt gula pilar finns kvar för jämförelse. Pilspetsarna pekar mot det nya resultatet. Texten under diagrammet förklarar riktningen och anger arbetsfärgrymd och visat steg före och efter ändringen, även när färgrymden byts. Byte av 3D-vyns steg visar också förflyttningen. Avmarkera för en statisk vy. Färgbevarande konvertering kan ge mycket små rörelser; pappersvitt och trycksvärta ändrar inte absoluta Lab-positioner.
+Markera **Visa förflyttning** för gula pilar. I **Skrivarprofiler** går pilarna alltid **original > förväntad utskrift**, oavsett vilka punkter som visas: pilens början är originalfärgen och spetsen är utskriftsfärgen. I **Färgrymder** jämför pilarna föregående och nya lägen när inställningar eller visat steg ändras. Pappersvitt och trycksvärta ändrar inte absoluta Lab-positioner.
+
+Svaga, tunna pilar visar sällsynta färger; starkare pilar visar vanligare färger i bildens stickprov. Pilens längd visar färgskillnaden, inte förekomsten. Ingen färggrupp döljs av viktningen. Långa pilar kan komma från ett fåtal starkt mättade färger som skrivaren inte kan återge; de betyder inte att större delen av bilden ändras lika mycket.
 
 **Jämför vänster → höger** jämför den låsta vänsterbilden med aktuell högerbild. Punkterna visar alltid högerbildens färger. En gul pil börjar vid motsvarande färgläge i vänsterbilden och slutar vid högerbildens punkt. Små pilspetsar håller punkterna synliga; referensringar visas inte. Den korta bildtexten anger båda profilerna. Byte av bilderna vänder jämförelsen. Återställning av vänsterbilden tar bort referensjämförelsen. Detta är profilernas absoluta D50-färger; skärmens pappers-/svärtsimulering ändrar inte koordinaterna.
 
@@ -134,7 +136,7 @@ Markera **Visa förflyttning** och ändra arbetsfärgrymd, skrivarprofil, återg
 
 ## 6. Spara och skriv ut
 
-Välj **Konvertera och spara** när en bild och en skrivar-/pappersprofil är valda. Appen bearbetar hela bilden via arbetsfärgrymden och skrivarprofilen och bäddar sedan in vald ICC-fil **byte för byte**. Originalbilden får inte skrivas över. Nya filer följer systemets umask; ersättning av en befintlig export bevarar dess behörighetsbitar. En temporär fil skrivs färdigt innan målfilen ersätts.
+Välj **Konvertera och spara** när en bild och en skrivar-/pappersprofil är valda. Sparande finns i fliken Skrivarprofiler. Appen bearbetar hela originalbilden direkt från källprofilen till högerbildens skrivarprofil och bäddar sedan in vald ICC-fil **byte för byte**. Originalbilden får inte skrivas över. Nya filer följer systemets umask; ersättning av en befintlig export bevarar dess behörighetsbitar. En temporär fil skrivs färdigt innan målfilen ersätts.
 
 | Format | Utkanaler som stöds |
 | --- | --- |

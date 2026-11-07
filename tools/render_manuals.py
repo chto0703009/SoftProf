@@ -54,16 +54,13 @@ class Pipeline(Flowable):
         Flowable.__init__(self); self.width=WIDTH; self.height=64; self.language=language
     def draw(self):
         c=self.canv
-        names = ['Källprofil','Arbetsfärgrymd','Skrivarprofil'] if self.language=='sv' else ['Source profile','Working space','Printer profile']
-        box=(WIDTH-44)/3
+        names = ['1  Källprofil → Arbetsfärgrymd','2  Källprofil → Skrivarprofil'] if self.language=='sv' else ['1  Source → Working space','2  Source → Printer profile']
+        box=(WIDTH-16)/2
         for index,name in enumerate(names):
-            x=index*(box+22)
+            x=index*(box+16)
             c.setFillColor(colors.HexColor('#e9f5f6')); c.setStrokeColor(TEAL)
             c.roundRect(x,14,box,36,7,stroke=1,fill=1)
-            c.setFillColor(NAVY);c.setFont('GuideBold',10);c.drawCentredString(x+box/2,27,name)
-            if index<2:
-                c.setStrokeColor(TEAL);c.setLineWidth(1.3);c.line(x+box+4,32,x+box+18,32)
-                c.line(x+box+14,36,x+box+18,32);c.line(x+box+14,28,x+box+18,32)
+            c.setFillColor(NAVY);c.setFont('GuideBold',9);c.drawCentredString(x+box/2,27,name)
 
 
 class GamutIllustration(Flowable):
